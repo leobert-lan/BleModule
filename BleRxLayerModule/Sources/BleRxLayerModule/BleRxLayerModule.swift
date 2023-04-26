@@ -13,15 +13,14 @@ public struct BleRxLayerModule {
         connectionManager = ConnectionManager(peripheralGattManager: peripheralManager)
     }
     
+    /// 搜索Ble蓝牙设备
     func scanTarget(uuids: [CBUUID]? = nil, matcher: ScanMatching? = nil, options: ScanOptions? = nil,
                     scanTimeout: RxTimeInterval = ScanDefaults.defaultScanTimeout) -> Observable<ScanData>
     {
         return connectionManager.scan(for: uuids, scanMatcher: matcher, options: options, scanTimeout: scanTimeout)
     }
     
-    /**
-     连接指定蓝牙设备
-     */
+    /// 连接指定蓝牙设备
     func connect(uuids: [CBUUID]? = nil,
                  scanMatcher: ScanMatching? = nil,
                  options: ScanOptions? = nil,
@@ -37,6 +36,7 @@ public struct BleRxLayerModule {
             }
     }
     
+    /// 监听连接状态
     func listenConnectedState(
         onNext: @escaping ((Bool) -> Void),
         onError: ((Swift.Error) -> Void)? = nil,
@@ -67,10 +67,16 @@ public struct BleRxLayerModule {
             })
     }
     
+    func send(sdu: any ISDU, service: CBUUID, characteristic: CBUUID) -> Single<Write.Element> {
+        return peripheralManager.queue(operation: Write(service: service, characteristic: characteristic, data: Data(sdu.content)))
+    }
+    
+    /// 注册 notify、indicate 类型特征码监听
+    /// [analyzer] 处理粘包、分包->拼包 的分析器
     func registerNotifyReceiver(
         svcUuid: CBUUID, characteristic: CBUUID,
         analyzer: ISduAnalyzer,
-        receiver: BehaviorSubject<ISDU>
+        receiver: BehaviorSubject<any ISDU>
     ) -> Disposable {
         let byteArrayReceiver = BehaviorSubject<ByteArray>.init(value: [])
         let disposable = listeneNotify(svcUuid: svcUuid, characteristic: characteristic, receiver: byteArrayReceiver)
@@ -114,7 +120,7 @@ public class DeviceNameScanMatcher: ScanMatching {
     private let scanDataSequence = ReplaySubject<ScanData>.create(bufferSize: 1)
 }
 
-extension Data {
+public extension Data {
     func hexEncodedString() -> String {
         return "0x" + map { String(format: "%02hhx", $0) }.joined()
     }
